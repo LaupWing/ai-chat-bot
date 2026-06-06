@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Send, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 type ChatMessage = {
     role: 'assistant' | 'user';
@@ -22,6 +24,26 @@ const WELCOME: ChatMessage = {
 
 function Logo({ className }: { className?: string }) {
     return <img src={LOGO} alt="The Golden Glow" className={className} />;
+}
+
+function readCookie(name: string): string {
+    const match = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : '';
+}
+
+function Markdown({ content }: { content: string }) {
+    return (
+        <div className="[&_a]:font-medium [&_a]:text-[#cb6843] [&_a]:underline [&_a]:underline-offset-2 [&_li]:mb-0.5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-4">
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                    a: ({ node, ...props }) => <a target="_blank" rel="noreferrer" {...props} />,
+                }}
+            >
+                {content}
+            </ReactMarkdown>
+        </div>
+    );
 }
 
 export default function ChatWidget() {
@@ -65,28 +87,44 @@ export default function ChatWidget() {
         setShowTeaser(false);
     }
 
-    function send(text: string) {
+    async function send(text: string) {
         const trimmed = text.trim();
         if (!trimmed || thinking) {
             return;
         }
 
+        // Conversation so far (excluding the generic welcome message at index 0).
+        const history = messages.slice(1).map((m) => ({ role: m.role, content: m.content }));
+
         setMessages((prev) => [...prev, { role: 'user', content: trimmed }]);
         setInput('');
         setThinking(true);
 
-        // Placeholder reply — wired to the ClinicAssistant agent in the next step.
-        window.setTimeout(() => {
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-XSRF-TOKEN': readCookie('XSRF-TOKEN'),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ message: trimmed, history }),
+            });
+
+            const data = (await response.json()) as { reply?: string };
             setMessages((prev) => [
                 ...prev,
-                {
-                    role: 'assistant',
-                    content:
-                        'Bedankt voor je vraag! Binnenkort beantwoord ik dit automatisch op basis van onze website. (Demo-modus)',
-                },
+                { role: 'assistant', content: data.reply ?? 'Excuses, er ging iets mis. Probeer het later opnieuw.' },
             ]);
+        } catch {
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: 'Excuses, er ging iets mis. Probeer het later opnieuw.' },
+            ]);
+        } finally {
             setThinking(false);
-        }, 900);
+        }
     }
 
     const showSuggestions = welcomeDone && messages.length === 1 && !thinking;
@@ -164,11 +202,17 @@ export default function ChatWidget() {
                                                 : 'rounded-bl-sm bg-white text-gray-700 ring-1 ring-black/5'
                                         }`}
                                     >
-                                        {text}
-                                        {typing && (
-                                            <span className="ml-0.5 inline-block w-[2px] animate-pulse bg-[#cb6843] align-middle">
-                                                &nbsp;
-                                            </span>
+                                        {message.role === 'assistant' && !typing ? (
+                                            <Markdown content={text} />
+                                        ) : (
+                                            <>
+                                                {text}
+                                                {typing && (
+                                                    <span className="ml-0.5 inline-block w-[2px] animate-pulse bg-[#cb6843] align-middle">
+                                                        &nbsp;
+                                                    </span>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                 </div>
