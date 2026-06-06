@@ -6,9 +6,12 @@ import remarkGfm from 'remark-gfm';
 type ChatMessage = {
     role: 'assistant' | 'user';
     content: string;
+    /** Assistant messages animate in with a typewriter effect until revealed. */
+    revealed: boolean;
 };
 
 const LOGO = '/images/golden-glow-logo.png';
+const TYPE_SPEED_MS = 12;
 
 const SUGGESTIONS = [
     'Wat kost een fillerbehandeling?',
@@ -18,6 +21,7 @@ const SUGGESTIONS = [
 
 const WELCOME: ChatMessage = {
     role: 'assistant',
+    revealed: false,
     content:
         'Hallo! Ik ben de digitale assistent van The Golden Glow. Stel gerust een vraag over onze behandelingen, prijzen of het maken van een afspraak.',
 };
@@ -52,12 +56,11 @@ export default function ChatWidget() {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
     const [thinking, setThinking] = useState(false);
-
-    // Typewriter state for the initial welcome message.
     const [typedCount, setTypedCount] = useState(0);
-    const [welcomeDone, setWelcomeDone] = useState(false);
-
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Index of the assistant message currently being typed out (-1 if none).
+    const typingIndex = open ? messages.findIndex((m) => m.role === 'assistant' && !m.revealed) : -1;
 
     // Show the teaser bubble shortly after the launcher has bounced in.
     useEffect(() => {
@@ -65,22 +68,24 @@ export default function ChatWidget() {
         return () => window.clearTimeout(timer);
     }, []);
 
-    // Type out the welcome message once the chat is opened.
+    // Typewriter: reveal the active assistant message one character at a time.
     useEffect(() => {
-        if (!open || welcomeDone) {
+        if (typingIndex === -1) {
             return;
         }
-        if (typedCount >= WELCOME.content.length) {
-            setWelcomeDone(true);
+        const full = messages[typingIndex].content;
+        if (typedCount >= full.length) {
+            setMessages((prev) => prev.map((m, i) => (i === typingIndex ? { ...m, revealed: true } : m)));
+            setTypedCount(0);
             return;
         }
-        const timer = window.setTimeout(() => setTypedCount((c) => c + 1), 16);
+        const timer = window.setTimeout(() => setTypedCount((c) => c + 1), TYPE_SPEED_MS);
         return () => window.clearTimeout(timer);
-    }, [open, welcomeDone, typedCount]);
+    }, [typingIndex, typedCount, messages]);
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }, [messages, thinking, open, typedCount, welcomeDone]);
+    }, [messages, thinking, open, typedCount]);
 
     function openChat() {
         setOpen(true);
@@ -96,7 +101,7 @@ export default function ChatWidget() {
         // Conversation so far (excluding the generic welcome message at index 0).
         const history = messages.slice(1).map((m) => ({ role: m.role, content: m.content }));
 
-        setMessages((prev) => [...prev, { role: 'user', content: trimmed }]);
+        setMessages((prev) => [...prev, { role: 'user', content: trimmed, revealed: true }]);
         setInput('');
         setThinking(true);
 
@@ -115,19 +120,23 @@ export default function ChatWidget() {
             const data = (await response.json()) as { reply?: string };
             setMessages((prev) => [
                 ...prev,
-                { role: 'assistant', content: data.reply ?? 'Excuses, er ging iets mis. Probeer het later opnieuw.' },
+                {
+                    role: 'assistant',
+                    content: data.reply ?? 'Excuses, er ging iets mis. Probeer het later opnieuw.',
+                    revealed: false,
+                },
             ]);
         } catch {
             setMessages((prev) => [
                 ...prev,
-                { role: 'assistant', content: 'Excuses, er ging iets mis. Probeer het later opnieuw.' },
+                { role: 'assistant', content: 'Excuses, er ging iets mis. Probeer het later opnieuw.', revealed: false },
             ]);
         } finally {
             setThinking(false);
         }
     }
 
-    const showSuggestions = welcomeDone && messages.length === 1 && !thinking;
+    const showSuggestions = messages.length === 1 && messages[0].revealed && !thinking;
 
     return (
         <>
@@ -181,9 +190,8 @@ export default function ChatWidget() {
                     {/* Messages */}
                     <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#fff7f2] px-3 py-4">
                         {messages.map((message, i) => {
-                            const isWelcome = i === 0;
-                            const text = isWelcome && !welcomeDone ? WELCOME.content.slice(0, typedCount) : message.content;
-                            const typing = isWelcome && !welcomeDone;
+                            const isTyping = i === typingIndex;
+                            const text = isTyping ? message.content.slice(0, typedCount) : message.content;
 
                             return (
                                 <div
@@ -202,12 +210,12 @@ export default function ChatWidget() {
                                                 : 'rounded-bl-sm bg-white text-gray-700 ring-1 ring-black/5'
                                         }`}
                                     >
-                                        {message.role === 'assistant' && !typing ? (
+                                        {message.role === 'assistant' && !isTyping ? (
                                             <Markdown content={text} />
                                         ) : (
                                             <>
                                                 {text}
-                                                {typing && (
+                                                {isTyping && (
                                                     <span className="ml-0.5 inline-block w-[2px] animate-pulse bg-[#cb6843] align-middle">
                                                         &nbsp;
                                                     </span>
