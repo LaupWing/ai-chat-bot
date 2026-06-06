@@ -30,6 +30,11 @@ export default function ChatWidget() {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
     const [thinking, setThinking] = useState(false);
+
+    // Typewriter state for the initial welcome message.
+    const [typedCount, setTypedCount] = useState(0);
+    const [welcomeDone, setWelcomeDone] = useState(false);
+
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Show the teaser bubble shortly after the launcher has bounced in.
@@ -38,9 +43,22 @@ export default function ChatWidget() {
         return () => window.clearTimeout(timer);
     }, []);
 
+    // Type out the welcome message once the chat is opened.
+    useEffect(() => {
+        if (!open || welcomeDone) {
+            return;
+        }
+        if (typedCount >= WELCOME.content.length) {
+            setWelcomeDone(true);
+            return;
+        }
+        const timer = window.setTimeout(() => setTypedCount((c) => c + 1), 16);
+        return () => window.clearTimeout(timer);
+    }, [open, welcomeDone, typedCount]);
+
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }, [messages, thinking, open]);
+    }, [messages, thinking, open, typedCount, welcomeDone]);
 
     function openChat() {
         setOpen(true);
@@ -70,6 +88,8 @@ export default function ChatWidget() {
             setThinking(false);
         }, 900);
     }
+
+    const showSuggestions = welcomeDone && messages.length === 1 && !thinking;
 
     return (
         <>
@@ -122,27 +142,38 @@ export default function ChatWidget() {
 
                     {/* Messages */}
                     <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#fff7f2] px-3 py-4">
-                        {messages.map((message, i) => (
-                            <div
-                                key={i}
-                                className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                            >
-                                {message.role === 'assistant' && (
-                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white p-1 ring-1 ring-black/5">
-                                        <Logo className="h-full w-full object-contain" />
-                                    </div>
-                                )}
+                        {messages.map((message, i) => {
+                            const isWelcome = i === 0;
+                            const text = isWelcome && !welcomeDone ? WELCOME.content.slice(0, typedCount) : message.content;
+                            const typing = isWelcome && !welcomeDone;
+
+                            return (
                                 <div
-                                    className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                                        message.role === 'user'
-                                            ? 'rounded-br-sm bg-[#cb6843] text-white'
-                                            : 'rounded-bl-sm bg-white text-gray-700 ring-1 ring-black/5'
-                                    }`}
+                                    key={i}
+                                    className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
-                                    {message.content}
+                                    {message.role === 'assistant' && (
+                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white p-1 ring-1 ring-black/5">
+                                            <Logo className="h-full w-full object-contain" />
+                                        </div>
+                                    )}
+                                    <div
+                                        className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                                            message.role === 'user'
+                                                ? 'rounded-br-sm bg-[#cb6843] text-white'
+                                                : 'rounded-bl-sm bg-white text-gray-700 ring-1 ring-black/5'
+                                        }`}
+                                    >
+                                        {text}
+                                        {typing && (
+                                            <span className="ml-0.5 inline-block w-[2px] animate-pulse bg-[#cb6843] align-middle">
+                                                &nbsp;
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
 
                         {thinking && (
                             <div className="flex items-end gap-2">
@@ -157,13 +188,14 @@ export default function ChatWidget() {
                             </div>
                         )}
 
-                        {messages.length === 1 && !thinking && (
+                        {showSuggestions && (
                             <div className="space-y-2 pt-1">
-                                {SUGGESTIONS.map((s) => (
+                                {SUGGESTIONS.map((s, i) => (
                                     <button
                                         key={s}
                                         onClick={() => send(s)}
-                                        className="block w-full rounded-xl bg-white px-3 py-2 text-left text-sm text-[#cb6843] ring-1 ring-[#cb6843]/20 transition-colors hover:bg-[#cb6843] hover:text-white"
+                                        style={{ animationDelay: `${i * 180}ms` }}
+                                        className="animate-chat-teaser-in block w-full rounded-xl bg-white px-3 py-2 text-left text-sm text-[#cb6843] ring-1 ring-[#cb6843]/20 transition-colors hover:bg-[#cb6843] hover:text-white"
                                     >
                                         {s}
                                     </button>
