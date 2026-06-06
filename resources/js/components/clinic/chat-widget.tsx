@@ -35,6 +35,18 @@ function readCookie(name: string): string {
     return match ? decodeURIComponent(match[2]) : '';
 }
 
+/** Strip Markdown syntax so the typewriter shows clean text instead of raw symbols. */
+function toPlainText(markdown: string): string {
+    return markdown
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links -> label
+        .replace(/(\*\*|__)(.*?)\1/g, '$2') // bold
+        .replace(/(\*|_)(.*?)\1/g, '$2') // italic
+        .replace(/`([^`]+)`/g, '$1') // inline code
+        .replace(/^\s*#{1,6}\s+/gm, '') // headings
+        .replace(/^\s*[-*+]\s+/gm, '• ') // bullets
+        .trim();
+}
+
 function Markdown({ content }: { content: string }) {
     return (
         <div className="[&_a]:font-medium [&_a]:text-[#cb6843] [&_a]:underline [&_a]:underline-offset-2 [&_li]:mb-0.5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-4">
@@ -73,7 +85,7 @@ export default function ChatWidget() {
         if (typingIndex === -1) {
             return;
         }
-        const full = messages[typingIndex].content;
+        const full = toPlainText(messages[typingIndex].content);
         if (typedCount >= full.length) {
             setMessages((prev) => prev.map((m, i) => (i === typingIndex ? { ...m, revealed: true } : m)));
             setTypedCount(0);
@@ -191,7 +203,7 @@ export default function ChatWidget() {
                     <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#fff7f2] px-3 py-4">
                         {messages.map((message, i) => {
                             const isTyping = i === typingIndex;
-                            const text = isTyping ? message.content.slice(0, typedCount) : message.content;
+                            const text = isTyping ? toPlainText(message.content).slice(0, typedCount) : message.content;
 
                             return (
                                 <div
