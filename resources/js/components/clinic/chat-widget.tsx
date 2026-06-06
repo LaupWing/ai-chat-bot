@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Send, Sparkles, X } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 
 type ChatMessage = {
     role: 'assistant' | 'user';
     content: string;
 };
+
+const LOGO = '/images/golden-glow-logo.png';
 
 const SUGGESTIONS = [
     'Wat kost een fillerbehandeling?',
@@ -18,16 +20,32 @@ const WELCOME: ChatMessage = {
         'Hallo! Ik ben de digitale assistent van The Golden Glow. Stel gerust een vraag over onze behandelingen, prijzen of het maken van een afspraak.',
 };
 
+function Logo({ className }: { className?: string }) {
+    return <img src={LOGO} alt="The Golden Glow" className={className} />;
+}
+
 export default function ChatWidget() {
     const [open, setOpen] = useState(false);
+    const [showTeaser, setShowTeaser] = useState(false);
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
     const [thinking, setThinking] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    // Show the teaser bubble shortly after the launcher has bounced in.
+    useEffect(() => {
+        const timer = window.setTimeout(() => setShowTeaser(true), 1800);
+        return () => window.clearTimeout(timer);
+    }, []);
+
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }, [messages, thinking, open]);
+
+    function openChat() {
+        setOpen(true);
+        setShowTeaser(false);
+    }
 
     function send(text: string) {
         const trimmed = text.trim();
@@ -55,27 +73,51 @@ export default function ChatWidget() {
 
     return (
         <>
-            {/* Launcher */}
-            <button
-                onClick={() => setOpen((v) => !v)}
-                aria-label="Open chat"
-                className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#cb6843] text-white shadow-lg shadow-[#cb6843]/30 transition-transform hover:scale-105 active:scale-95"
-            >
-                {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-            </button>
+            {/* Launcher + teaser — hidden once the chat is open */}
+            {!open && (
+                <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+                    {showTeaser && (
+                        <div className="animate-chat-teaser-in flex max-w-[15rem] items-center gap-2 rounded-2xl rounded-br-sm bg-white px-4 py-3 text-sm text-gray-700 shadow-xl ring-1 ring-black/5">
+                            <span>👋 Hallo! Kan ik je ergens mee helpen?</span>
+                            <button
+                                onClick={() => setShowTeaser(false)}
+                                aria-label="Sluit melding"
+                                className="-mr-1 shrink-0 rounded-full p-0.5 text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={openChat}
+                        aria-label="Open chat"
+                        className="animate-chat-pop-up flex h-16 w-16 items-center justify-center rounded-full bg-white p-2.5 shadow-lg shadow-[#cb6843]/30 ring-1 ring-[#cb6843]/15 transition-transform hover:scale-105 active:scale-95"
+                    >
+                        <Logo className="h-full w-full object-contain" />
+                    </button>
+                </div>
+            )}
 
             {/* Panel */}
             {open && (
-                <div className="fixed bottom-24 right-5 z-50 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+                <div className="fixed bottom-5 right-5 z-50 flex h-[34rem] max-h-[calc(100vh-2.5rem)] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
                     {/* Header */}
                     <div className="flex items-center gap-3 bg-[#cb6843] px-4 py-3 text-white">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20">
-                            <Sparkles className="h-5 w-5" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white p-1.5">
+                            <Logo className="h-full w-full object-contain" />
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <p className="font-['Playfair_Display',serif] text-base leading-tight">The Golden Glow</p>
                             <p className="text-xs text-white/80">Digitale assistent</p>
                         </div>
+                        <button
+                            onClick={() => setOpen(false)}
+                            aria-label="Sluit chat"
+                            className="rounded-full p-1.5 text-white/90 transition-colors hover:bg-white/15"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
                     </div>
 
                     {/* Messages */}
@@ -83,10 +125,15 @@ export default function ChatWidget() {
                         {messages.map((message, i) => (
                             <div
                                 key={i}
-                                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
+                                {message.role === 'assistant' && (
+                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white p-1 ring-1 ring-black/5">
+                                        <Logo className="h-full w-full object-contain" />
+                                    </div>
+                                )}
                                 <div
-                                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                                    className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                                         message.role === 'user'
                                             ? 'rounded-br-sm bg-[#cb6843] text-white'
                                             : 'rounded-bl-sm bg-white text-gray-700 ring-1 ring-black/5'
@@ -98,7 +145,10 @@ export default function ChatWidget() {
                         ))}
 
                         {thinking && (
-                            <div className="flex justify-start">
+                            <div className="flex items-end gap-2">
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white p-1 ring-1 ring-black/5">
+                                    <Logo className="h-full w-full object-contain" />
+                                </div>
                                 <div className="flex gap-1 rounded-2xl rounded-bl-sm bg-white px-3.5 py-3 ring-1 ring-black/5">
                                     <span className="h-2 w-2 animate-bounce rounded-full bg-[#cb6843]/60 [animation-delay:-0.3s]" />
                                     <span className="h-2 w-2 animate-bounce rounded-full bg-[#cb6843]/60 [animation-delay:-0.15s]" />

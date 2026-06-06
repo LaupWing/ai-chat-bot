@@ -57,8 +57,11 @@ export default function Clinic() {
                 {/* Header */}
                 <header className="sticky top-0 z-40 border-b border-black/5 bg-[#ffece2]/90 backdrop-blur">
                     <div className="mx-auto flex max-w-6xl items-center justify-between px-[5%] py-4">
-                        <a href="/" className="font-['Playfair_Display',serif] text-xl font-semibold uppercase tracking-wide text-[#cb6843]">
-                            The Golden Glow
+                        <a href="/" className="flex items-center gap-2.5">
+                            <img src="/images/golden-glow-logo.png" alt="The Golden Glow" className="h-9 w-9 object-contain" />
+                            <span className="font-['Playfair_Display',serif] text-xl font-semibold uppercase tracking-wide text-[#cb6843]">
+                                The Golden Glow
+                            </span>
                         </a>
                         <nav className="hidden items-center gap-7 text-sm font-medium uppercase tracking-wide lg:flex">
                             {TREATMENTS.slice(0, 5).map((t) => (
